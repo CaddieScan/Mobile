@@ -4,8 +4,8 @@ import 'components/fidelity_card.dart';
 import 'components/purchase_item.dart';
 import 'components/visit_item.dart';
 
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+class ScanPage extends StatelessWidget {
+  const ScanPage({super.key});
 
   @override
   Widget build(BuildContext context) {

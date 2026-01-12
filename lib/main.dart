@@ -1,3 +1,4 @@
+import 'package:caddiescan/scan_page.dart';
 import 'package:caddiescan/shop_choice.dart';
 import 'package:flutter/material.dart';
 import 'login_page.dart';
@@ -15,15 +16,14 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flutter Demo',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
+      theme: ThemeData(primarySwatch: Colors.blue, fontFamily: 'Outfit'),
       initialRoute: '/',
       routes: {
         '/': (context) => const LoginPage(),
         '/home': (context) => const HomePage(),
         '/profile': (context) => const ProfilePage(),
         '/shop_choice': (context) => const ShopChoicePage(),
+        '/scan': (context) => const ScanPage(),
       },
     );
   }

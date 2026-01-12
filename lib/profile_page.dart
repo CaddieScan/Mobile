@@ -21,7 +21,10 @@ class ProfilePage extends StatelessWidget {
         title: const Text(
           'Profil',
           style: TextStyle(
-              color: Colors.black, fontSize: 17, fontWeight: FontWeight.w600),
+            color: Colors.black,
+            fontSize: 17,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );

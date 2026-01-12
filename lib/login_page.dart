@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 class LoginPage extends StatelessWidget {
@@ -7,9 +6,7 @@ class LoginPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Connexion'),
-      ),
+      appBar: AppBar(title: const Text('Connexion')),
       body: Center(
         child: ElevatedButton(
           onPressed: () {

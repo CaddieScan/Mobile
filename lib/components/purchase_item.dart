@@ -21,11 +21,14 @@ class PurchaseItem extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(35)),
       child: ListTile(
         leading: CircleAvatar(
-            backgroundColor: Colors.grey.shade200,
-            child: Icon(icon, color: Colors.red.shade400),
-          ),
+          backgroundColor: Colors.grey.shade200,
+          child: Icon(icon, color: Colors.red.shade400),
+        ),
         title: Text(store, style: const TextStyle(fontWeight: FontWeight.w500)),
-        trailing: Text(amount, style: const TextStyle(fontWeight: FontWeight.w400, fontSize: 16)),
+        trailing: Text(
+          amount,
+          style: const TextStyle(fontWeight: FontWeight.w400, fontSize: 16),
+        ),
       ),
     );
   }

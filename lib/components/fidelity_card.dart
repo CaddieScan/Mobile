@@ -23,15 +23,29 @@ class FidelityCard extends StatelessWidget {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Icon(Icons.shopping_basket, color: Colors.red, size: 30),
+                  child: const Icon(
+                    Icons.shopping_basket,
+                    color: Colors.red,
+                    size: 30,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
-                    Text('Auchan', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text(
+                      'Auchan',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     SizedBox(height: 4),
-                    Text('1.34€', style: TextStyle(color: Colors.white, fontSize: 16)),
+                    Text(
+                      '1.34€',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
                   ],
                 ),
               ],
