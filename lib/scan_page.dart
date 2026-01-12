@@ -164,7 +164,7 @@ class ScanPageState extends State<ScanPage> {
       floatingActionButton: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          FloatingActionButton.extended(onPressed: () {}, icon: const Icon(Icons.shopping_cart_checkout), label: const Text("Panier")),
+          FloatingActionButton.extended(onPressed: () {Navigator.pushNamed(context, '/cart_list'); }, icon: const Icon(Icons.shopping_cart_checkout), label: const Text("Panier")),
           FloatingActionButton.extended(onPressed: () {}, icon: const Icon(Icons.check), label: const Text("Valider")),
         ],
       ),
