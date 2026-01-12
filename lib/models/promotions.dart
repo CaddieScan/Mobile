@@ -1,15 +1,28 @@
-import 'package:flutter/material.dart';
+class Promotion {
+  final int id;
+  final int magasinId;
+  final String libelle;
+  final DateTime dateHeureDebut;
+  final DateTime dateHeureFin;
+  final String modePromotion;
+  final bool caniotteImmediate;
+  final int? quantiteAcheter;
+  final int? quantiteOffert;
+  final double? reductionFixe;
+  final int? pourcentageReduction;
 
-class Shop {
-  String location;
-  double km;
-  IconData icon;
-  bool isFavorite;
-
-  Shop({
-    required this.location,
-    required this.km,
-    required this.icon,
-    this.isFavorite = false,
+  Promotion({
+    required this.id,
+    required this.magasinId,
+    required this.libelle,
+    required this.dateHeureDebut,
+    required this.dateHeureFin,
+    required this.modePromotion,
+    required this.caniotteImmediate,
+    this.quantiteAcheter,
+    this.quantiteOffert,
+    this.reductionFixe,
+    this.pourcentageReduction,
   });
 }
+
