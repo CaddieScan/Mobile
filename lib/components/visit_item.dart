@@ -24,8 +24,14 @@ class VisitItem extends StatelessWidget {
           backgroundColor: Colors.grey.shade200,
           child: Icon(icon, color: Colors.red.shade400),
         ),
-        title: Text(location, style: const TextStyle(fontWeight: FontWeight.w500)),
-        trailing: Text(visits, style: const TextStyle(fontWeight: FontWeight.w400, fontSize: 14)),
+        title: Text(
+          location,
+          style: const TextStyle(fontWeight: FontWeight.w500),
+        ),
+        trailing: Text(
+          visits,
+          style: const TextStyle(fontWeight: FontWeight.w400, fontSize: 14),
+        ),
       ),
     );
   }
