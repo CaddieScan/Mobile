@@ -22,14 +22,14 @@ class ProductCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    product.name,
+                    product.libelle,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  Text('Quantité: ${product.quantity}'),
+                  Text('Quantité: 1'),
                 ],
               ),
             ),
-            Text('${(product.price * product.quantity).toStringAsFixed(2)}€'),
+            Text('${(product.price * 1).toStringAsFixed(2)}€'),
           ],
         ),
       ),
