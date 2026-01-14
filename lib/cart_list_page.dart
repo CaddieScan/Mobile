@@ -13,16 +13,16 @@ class CartListPage extends StatefulWidget {
 class CartListPageState extends State<CartListPage> {
   // produits en dur du panier
   final List<Product> cartItems = [
-    Product(name: 'Kinder Bueno', price: 4.25, quantity: 2),
-    Product(name: "Jus d'orange 1L", price: 2.50, quantity: 1),
-    Product(name: 'Tablette de chocolat', price: 1.80, quantity: 3),
+    //Product( barcode: null, magasinId: null, rayonId: null, libelle: '', image: ''),
+    //Product(name: "Jus d'orange 1L", price: 2.50, quantity: 1),
+    //Product(name: 'Tablette de chocolat', price: 1.80, quantity: 3),
   ];
 
   // calculer le prix total
   double get totalPrice {
     return cartItems.fold(
       0,
-      (total, current) => total + (current.price * current.quantity),
+      (total, current) => total + (current.price * 1),
     );
   }
 
