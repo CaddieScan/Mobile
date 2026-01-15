@@ -107,7 +107,7 @@ class ScanPageState extends State<ScanPage> {
   Future<http.Response> fetchScan(barcode) {
     return http.get(
       Uri.parse(
-        'http://10.57.33.97:8000/product/get_product_by_barcode?barcode=${barcode}',
+        'http://10.0.2.2:8000/product/get_product_by_barcode?barcode=${barcode}',
       ),
     );
   }
@@ -115,16 +115,16 @@ class ScanPageState extends State<ScanPage> {
   // requête d'ajout du produit dans le panier
   Future<http.Response> addProductToCartInDB(Product product) {
     return http.post(
-      Uri.parse('http://10.57.33.97:8000/cart/product/'),
+      Uri.parse('http://10.0.2.2:8000/cart/product/'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        'user_id': 1,
-        'shop_id': 1,
-        'barcode': product.barcode,
-        'total_price': product.price,
+        'cart_id': 1,
+        'produit_id': product.barcode,
+        'quantity': 1
       }),
     );
   }
+
 
   void scannedProduct(String barcode) async {
     try {
@@ -155,9 +155,6 @@ class ScanPageState extends State<ScanPage> {
       enableAudio: false,
     );
     await controller!.initialize();
-    if (mounted) {
-      controller!.startImageStream(processImageStream);
-    }
     if (mounted) setState(() {});
   }
 
@@ -189,9 +186,10 @@ class ScanPageState extends State<ScanPage> {
 
       for (final barcode in barcodes) {
         if (barcode.rawValue != null) {
+          // on mets le bar code dans notre fonction pour le gérer
           scannedProduct(barcode.rawValue.toString());
-          //print('--- CODE-BARRES TROUVÉ --- : ${barcode.rawValue}');
-          // controller?.stopImageStream();
+          //on arrête la détection de barcode
+          controller?.stopImageStream();
         }
       }
     } catch (e) {
@@ -199,6 +197,13 @@ class ScanPageState extends State<ScanPage> {
     }
 
     isProcessing = false;
+  }
+
+  // on déclenche la détection du barcode, via le bouton
+  void scanOnce() async {
+    controller?.startImageStream(processImageStream);
+    await Future.delayed(const Duration(seconds: 5));
+    controller?.stopImageStream();
   }
 
   // on arrête le flux
@@ -308,11 +313,12 @@ class ScanPageState extends State<ScanPage> {
             child: Column(
               children: [
                 buildCameraPreview(),
+                const SizedBox(height: 8),
+                ElevatedButton(onPressed: scanOnce, child: const Text("Scanner")),
                 const SizedBox(height: 24),
                 Row(
                   children: [buildDisplayLastProduct(context), const Spacer()],
                 ),
-                // ElevatedButton(onPressed: scanOnce, child: const Text("Scanner")),
                 const SectionHeader(title: 'Promotions suggérées'),
                 const SizedBox(height: 16),
                 buildPromotionsGrid(),
