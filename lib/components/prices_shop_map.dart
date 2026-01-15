@@ -7,7 +7,7 @@ class ShopMap extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: MediaQuery.of(context).size.height * 0.75,
+      height: MediaQuery.of(context).size.height * 0.7,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
         child: Image.network(

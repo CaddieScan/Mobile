@@ -22,15 +22,8 @@ class ScanPageState extends State<ScanPage> {
   bool isProcessing = false;
 
   final TextEditingController searchController = TextEditingController();
-  final List<String> allProducts = [
-    'Kinder Bueno',
-    'Jus d\'orange',
-    'Tablette de chocolat',
-    'Oeufs',
-    'Lait',
-    'Pain de mie',
-  ];
-  List<String> searchResults = [];
+  List<Product> allProducts = [];
+  List<Product> searchResults = [];
 
   final List<Promotion> promotions = [
     Promotion(
@@ -82,14 +75,37 @@ class ScanPageState extends State<ScanPage> {
   void initState() {
     super.initState();
     initializeCamera();
+    fetchProducts();
+  }
 
-    searchController.addListener(() {
-      updateSearchResults(searchController.text);
-    });
+  // récupérer les produits du magasin
+  Future<void> fetchProducts() async {
+    print("Récupération des produits en cours...");
+    try {
+      final response = await http.get(
+        Uri.parse(
+          'http://10.0.2.2:8000/product/get_products_by_shopid?shop_id=1',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> jsonData = jsonDecode(response.body);
+        setState(() {
+          allProducts = jsonData.map((data) => Product.fromJson(data)).toList();
+          print("Produits récupérés : ${allProducts.length}");
+        });
+      } else {
+        print("Erreur HTTP ${response.statusCode}");
+      }
+    } catch (e) {
+      print("Erreur lors de la récupération des produits: $e");
+    }
   }
 
   // filtrer les produits de la recherche
   void updateSearchResults(String query) {
+    print("Recherche : $query");
+    print("Produits : ${allProducts}");
     if (query.isEmpty) {
       setState(() => searchResults = []);
       return;
@@ -97,10 +113,12 @@ class ScanPageState extends State<ScanPage> {
     setState(() {
       searchResults = allProducts
           .where(
-            (product) => product.toLowerCase().contains(query.toLowerCase()),
+            (product) =>
+                product.libelle.toLowerCase().contains(query.toLowerCase()),
           )
           .toList();
     });
+    print("Produits trouvés : ${searchResults.length}");
   }
 
   // requête de recherche du produit par son code-barre
@@ -120,11 +138,10 @@ class ScanPageState extends State<ScanPage> {
       body: jsonEncode({
         'cart_id': 1,
         'produit_id': product.barcode,
-        'quantity': 1
+        'quantity': 1,
       }),
     );
   }
-
 
   void scannedProduct(String barcode) async {
     try {
@@ -132,7 +149,7 @@ class ScanPageState extends State<ScanPage> {
 
       if (response.statusCode == 200) {
         // décoder le json
-        final product = Product.fromJson(response.body);
+        final product = Product.fromJson(jsonDecode(response.body));
         setState(() {
           scannedProductDatas = product;
         });
@@ -282,6 +299,26 @@ class ScanPageState extends State<ScanPage> {
     }
   }
 
+  // composant pour la liste des résultats de recherche
+  Widget buildSearchResultsList() {
+    return Container(
+      color: Colors.white,
+      child: ListView.builder(
+        itemCount: searchResults.length,
+        itemBuilder: (context, index) {
+          final product = searchResults[index];
+          return ListTile(
+            title: Text(product.libelle),
+            onTap: () {
+              Navigator.pushNamed(context, '/map');
+              searchController.clear();
+            },
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -293,6 +330,7 @@ class ScanPageState extends State<ScanPage> {
         // l'input de recherche
         title: TextField(
           controller: searchController,
+          onChanged: updateSearchResults,
           decoration: const InputDecoration(
             hintText: 'Rechercher un produit...',
             border: InputBorder.none,
@@ -314,7 +352,10 @@ class ScanPageState extends State<ScanPage> {
               children: [
                 buildCameraPreview(),
                 const SizedBox(height: 8),
-                ElevatedButton(onPressed: scanOnce, child: const Text("Scanner")),
+                ElevatedButton(
+                  onPressed: scanOnce,
+                  child: const Text("Scanner"),
+                ),
                 const SizedBox(height: 24),
                 Row(
                   children: [buildDisplayLastProduct(context), const Spacer()],
@@ -326,23 +367,7 @@ class ScanPageState extends State<ScanPage> {
               ],
             ),
           ),
-          if (searchResults.isNotEmpty)
-            Container(
-              color: Colors.white,
-              child: ListView.builder(
-                itemCount: searchResults.length,
-                itemBuilder: (context, index) {
-                  final product = searchResults[index];
-                  return ListTile(
-                    title: Text(product),
-                    onTap: () {
-                      Navigator.pushNamed(context, '/map');
-                      searchController.clear();
-                    },
-                  );
-                },
-              ),
-            ),
+          if (searchResults.isNotEmpty) buildSearchResultsList(),
         ],
       ),
       floatingActionButton: Row(

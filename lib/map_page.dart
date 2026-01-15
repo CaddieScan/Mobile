@@ -20,6 +20,7 @@ class MapPage extends StatelessWidget {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ShopMap(),
             PricesContainerMap(),

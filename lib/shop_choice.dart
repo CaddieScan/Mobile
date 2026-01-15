@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'components/section_header.dart';
 import 'components/shop_choice_card.dart';
 import 'models/shop.dart';
@@ -11,15 +13,43 @@ class ShopChoicePage extends StatefulWidget {
 }
 
 class ShopChoicePageState extends State<ShopChoicePage> {
-  final List<Shop> shops = [
+  late List<Shop> shops = [
     Shop(location: 'Auchan', km: 3.6, icon: Icons.storefront, isFavorite: true),
     Shop(location: 'Intermarché', km: 4.2, icon: Icons.storefront),
     Shop(location: 'Aldi', km: 6.8, icon: Icons.storefront),
   ];
 
+  // requête pour trouver tous les magasins en bdd (en attendant)
+  // il renvoie une liste de Shops
+  Future<http.Response> fetchScan() {
+    return http.get(
+      Uri.parse(
+        'http://10.0.2.2:8000/shop/all',
+      ),
+    );
+  }
+
+  void initShopList() {
+    fetchScan().then((response) {
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        setState(() {
+          shops = [];
+          for (int i = 0; i < data.length; i++) {
+            shops.add(Shop.fromJson(data[i]));
+          }
+          shops.sort((a, b) => a.km.compareTo(b.km));
+        });
+      } else {
+        print("Magasins non trouvés, status: ${response.statusCode}");
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
+    initShopList();
     shops.sort((a, b) => a.km.compareTo(b.km));
   }
 
@@ -82,8 +112,9 @@ class ShopChoicePageState extends State<ShopChoicePage> {
                         Navigator.pushNamed(context, '/scan');
                       },
                     ),
+
                 // si aucun favori, afficher qu'il n'y en a pas
-                if (shops.where((shop) => shop.isFavorite).isEmpty)
+                if (!shops.any((shop) => shop.isFavorite))
                   const Center(child: Text('Aucun favori')),
 
                 const SizedBox(height: 24),
@@ -101,6 +132,7 @@ class ShopChoicePageState extends State<ShopChoicePage> {
                       Navigator.pushNamed(context, '/scan');
                     },
                   ),
+
                 // si aucun magasin, afficher qu'il n'y en a pas
                 if (shops.isEmpty)
                   const Center(child: Text('Aucun magasin')),
