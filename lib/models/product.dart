@@ -16,14 +16,14 @@ class Product {
     required this.image,
   });
 
-  static Product fromJson(String body) {
-    final json = jsonDecode(body);
+  static Product fromJson(Map<String, dynamic> json) {
     return Product(
         barcode: json['code_barre'],
         rayonId: json['rayon_id'],
         libelle: json['libelle'],
         image: json['image'],
         price: json['prix'],
+
     );
   }
 
