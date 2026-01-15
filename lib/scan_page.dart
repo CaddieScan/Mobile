@@ -76,7 +76,7 @@ class ScanPageState extends State<ScanPage> {
     ),
   ];
 
- late Product scannedProductDatas ;
+  late Product scannedProductDatas;
 
   @override
   void initState() {
@@ -103,11 +103,26 @@ class ScanPageState extends State<ScanPage> {
     });
   }
 
+  // requête de recherche du produit par son code-barre
   Future<http.Response> fetchScan(barcode) {
     return http.get(
       Uri.parse(
         'http://10.57.33.97:8000/product/get_product_by_barcode?barcode=${barcode}',
       ),
+    );
+  }
+
+  // requête d'ajout du produit dans le panier
+  Future<http.Response> addProductToCartInDB(Product product) {
+    return http.post(
+      Uri.parse('http://10.57.33.97:8000/cart/product/'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'user_id': 1,
+        'shop_id': 1,
+        'barcode': product.barcode,
+        'total_price': product.price,
+      }),
     );
   }
 
@@ -122,6 +137,8 @@ class ScanPageState extends State<ScanPage> {
           scannedProductDatas = product;
         });
         print("PRODUIT SCANNE : ${product.libelle} - ${product.price}");
+        // ici on l'ajoute au panier
+        addProductToCartInDB(product);
       } else {
         print("Produit non trouvé, status: ${response.statusCode}");
       }
@@ -254,14 +271,11 @@ class ScanPageState extends State<ScanPage> {
 
   Widget buildDisplayLastProduct(BuildContext context) {
     try {
-
-        return Text("Dernier produit : ${scannedProductDatas.libelle}");
-      }
-    catch(e){
+      return Text("Dernier produit : ${scannedProductDatas.libelle}");
+    } catch (e) {
       return Text("Dernier produit :");
     }
-    }
-
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -296,10 +310,7 @@ class ScanPageState extends State<ScanPage> {
                 buildCameraPreview(),
                 const SizedBox(height: 24),
                 Row(
-                  children: [
-                   buildDisplayLastProduct(context),
-                    const Spacer(),
-                  ],
+                  children: [buildDisplayLastProduct(context), const Spacer()],
                 ),
                 // ElevatedButton(onPressed: scanOnce, child: const Text("Scanner")),
                 const SectionHeader(title: 'Promotions suggérées'),
