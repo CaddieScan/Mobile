@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:geolocator/geolocator.dart';
 import 'components/section_header.dart';
 import 'components/shop_choice_card.dart';
 import 'models/shop.dart';
@@ -13,24 +14,49 @@ class ShopChoicePage extends StatefulWidget {
 }
 
 class ShopChoicePageState extends State<ShopChoicePage> {
-  late List<Shop> shops = [
-    Shop(location: 'Auchan', km: 3.6, icon: Icons.storefront, isFavorite: true),
-    Shop(location: 'Intermarché', km: 4.2, icon: Icons.storefront),
-    Shop(location: 'Aldi', km: 6.8, icon: Icons.storefront),
-  ];
+  late List<Shop> shops = [];
 
-  // requête pour trouver tous les magasins en bdd (en attendant)
+  // requête pour trouver tous les magasins en bdd avec position
   // il renvoie une liste de Shops
-  Future<http.Response> fetchScan() {
-    return http.get(
-      Uri.parse(
-        'http://10.0.2.2:8000/shop/all',
-      ),
+  Future<http.Response> fetchScan(double lat, double lon) {
+    return http.post(
+      Uri.parse('http://10.57.33.97:8000/shop/proximity'),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "latitude": lat,
+        "longitude": lon,
+        "radius_km": 50
+      }),
     );
   }
 
-  void initShopList() {
-    fetchScan().then((response) {
+  void initShopList() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      print('Les services de localisation sont désactivés.');
+      return;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        print('Les permissions de localisation sont refusées.');
+        return;
+      }
+    }
+    
+    if (permission == LocationPermission.deniedForever) {
+      print('Les permissions de localisation sont refusées de façon permanente.');
+      return;
+    }
+
+    Position position = await Geolocator.getCurrentPosition();
+
+    fetchScan(position.latitude, position.longitude).then((response) {
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         setState(() {
@@ -39,6 +65,7 @@ class ShopChoicePageState extends State<ShopChoicePage> {
             shops.add(Shop.fromJson(data[i]));
           }
           shops.sort((a, b) => a.km.compareTo(b.km));
+          print(shops[0].km);
         });
       } else {
         print("Magasins non trouvés, status: ${response.statusCode}");
@@ -53,7 +80,29 @@ class ShopChoicePageState extends State<ShopChoicePage> {
     shops.sort((a, b) => a.km.compareTo(b.km));
   }
 
-  void toggleFavorite(int index) {
+  void toggleFavorite(int index) async {
+    print(index);
+    final shop = shops[index];
+    print(shop.id);
+    
+    // si on met en favoris le magasin, on appelle l'API
+    if (!shop.isFavorite) {
+      try {
+        final response = await http.post(
+          Uri.parse('http://10.57.33.97:8000/shop/favorite'),
+          headers: {"Content-Type": "application/json"},
+          body: jsonEncode({
+            "shop_id": shop.id
+          }),
+        );
+        if (response.statusCode != 200) {
+          print("Erreur lors de l'ajout aux favoris: ${response.statusCode}");
+        }
+      } catch (e) {
+        print("Erreur de connexion API favoris: $e");
+      }
+    }
+
     setState(() {
       shops[index].isFavorite = !shops[index].isFavorite;
     });
@@ -104,6 +153,8 @@ class ShopChoicePageState extends State<ShopChoicePage> {
                   if (shops[i].isFavorite == true)
                     ShopChoiceCard(
                       location: shops[i].location,
+                      latitude: shops[i].latitude,
+                      longitude: shops[i].longitude,
                       km: shops[i].km,
                       icon: shops[i].icon,
                       isFavorite: shops[i].isFavorite,
@@ -125,6 +176,8 @@ class ShopChoicePageState extends State<ShopChoicePage> {
                   ShopChoiceCard(
                     location: shops[i].location,
                     km: shops[i].km,
+                    latitude: shops[i].latitude,
+                    longitude: shops[i].longitude,
                     icon: shops[i].icon,
                     isFavorite: shops[i].isFavorite,
                     onFavoritePressed: () => toggleFavorite(i),

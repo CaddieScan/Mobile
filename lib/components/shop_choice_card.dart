@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 class ShopChoiceCard extends StatelessWidget {
   final String location;
   final double km;
+  final double latitude;
+  final double longitude;
   final IconData icon;
   final bool isFavorite;
   final VoidCallback onFavoritePressed;
@@ -12,6 +14,8 @@ class ShopChoiceCard extends StatelessWidget {
     super.key,
     required this.location,
     required this.km,
+    required this.latitude,
+    required this.longitude,
     required this.icon,
     required this.isFavorite,
     required this.onFavoritePressed,
@@ -50,7 +54,7 @@ class ShopChoiceCard extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    "${km}km",
+                    "${km.toStringAsFixed(2)}km",
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
