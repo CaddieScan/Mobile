@@ -29,7 +29,7 @@ class Shop {
       latitude: json['latitude'] ?? 0.0,
       longitude: json['longitude'] ?? 0.0,
       icon: Icons.storefront,
-      isFavorite: false,
+      isFavorite: json['is_favorite'] ?? false,
     );
   }
 }

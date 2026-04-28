@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:geolocator/geolocator.dart';
 import 'components/section_header.dart';
 import 'components/shop_choice_card.dart';
@@ -19,10 +20,12 @@ class ShopChoicePageState extends State<ShopChoicePage> {
   // requête pour trouver tous les magasins en bdd avec position
   // il renvoie une liste de Shops
   Future<http.Response> fetchScan(double lat, double lon) {
+    String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
     return http.post(
-      Uri.parse('http://10.57.33.97:8000/shop/proximity'),
+      Uri.parse('$baseUrl/shop/proximity?user_id=1'),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
+        "user_id": 1,
         "latitude": lat,
         "longitude": lon,
         "radius_km": 50
@@ -88,8 +91,9 @@ class ShopChoicePageState extends State<ShopChoicePage> {
     // si on met en favoris le magasin, on appelle l'API
     if (!shop.isFavorite) {
       try {
+        String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
         final response = await http.post(
-          Uri.parse('http://10.57.33.97:8000/shop/favorite'),
+          Uri.parse('$baseUrl/shop/favorite'),
           headers: {"Content-Type": "application/json"},
           body: jsonEncode({
             "shop_id": shop.id
