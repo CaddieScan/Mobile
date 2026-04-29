@@ -4,9 +4,11 @@ import 'package:caddiescan/models/product.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 import 'package:http/http.dart' as http;
 import 'components/section_header.dart';
+import 'services/cart_service.dart';
 import 'models/promotions.dart';
 
 class ScanPage extends StatefulWidget {
@@ -70,21 +72,48 @@ class ScanPageState extends State<ScanPage> {
   ];
 
   late Product scannedProductDatas;
+  int? currentCartId;
 
   @override
   void initState() {
     super.initState();
     initializeCamera();
     fetchProducts();
+    loadCartId();
+  }
+
+  // charger l'id du panier depuis le stockage local
+  Future<void> loadCartId() async {
+    try {
+      final savedId = await CartService.getCartId();
+      if (savedId != null) {
+        setState(() {
+          currentCartId = savedId;
+        });
+        print('ID panier chargé depuis SharedPreferences: $currentCartId');
+      } else {
+        print('Aucun ID panier trouvé en local');
+      }
+    } catch (e) {
+      print('Erreur lors du chargement de l\'ID panier: $e');
+    }
+  }
+
+  Future<void> _saveCartId(int id) async {
+    await CartService.setCartId(id);
+    if (mounted) {
+      print('ID panier enregistré en local: $id');
+    }
   }
 
   // récupérer les produits du magasin
   Future<void> fetchProducts() async {
     print("Récupération des produits en cours...");
     try {
+      String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
       final response = await http.get(
         Uri.parse(
-          'http://10.0.2.2:8000/product/get_products_by_shopid?shop_id=1',
+          '$baseUrl/product/get_products_by_shopid?shop_id=1',
         ),
       );
 
@@ -123,24 +152,48 @@ class ScanPageState extends State<ScanPage> {
 
   // requête de recherche du produit par son code-barre
   Future<http.Response> fetchScan(barcode) {
+    String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
     return http.get(
       Uri.parse(
-        'http://10.0.2.2:8000/product/get_product_by_barcode?barcode=${barcode}',
+        '$baseUrl/product/get_product_by_barcode?barcode=${barcode}',
       ),
     );
   }
 
   // requête d'ajout du produit dans le panier
-  Future<http.Response> addProductToCartInDB(Product product) {
+  Future<http.Response> addProductToCartInDB(Product product, int cartId) {
+    String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
     return http.post(
-      Uri.parse('http://10.0.2.2:8000/cart/product/'),
+      Uri.parse('$baseUrl/cart/product/'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        'cart_id': 1,
+        'cart_id': cartId,
         'produit_id': product.barcode,
         'quantity': 1,
       }),
     );
+  }
+
+  // création d'un nouveau panier
+  Future<int?> createCart(int userId, int shopId) async {
+    String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/cart/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'user_id': userId,
+          'shop_id': shopId,
+        }),
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['id'] as int;
+      }
+    } catch (e) {
+      print("Erreur création panier dynamique: $e");
+    }
+    return null;
   }
 
   void scannedProduct(String barcode) async {
@@ -154,8 +207,40 @@ class ScanPageState extends State<ScanPage> {
           scannedProductDatas = product;
         });
         print("PRODUIT SCANNE : ${product.libelle} - ${product.price}");
-        // ici on l'ajoute au panier
-        addProductToCartInDB(product);
+        
+        http.Response? cartResponse;
+
+        // on tente d'ajouter au panier courant s'il existe déjà
+        if (currentCartId != null) {
+          cartResponse = await addProductToCartInDB(product, currentCartId!);
+        }
+
+        // si pas de panier courant ou si ajout en échec, on crée un nouveau panier
+        if (cartResponse == null || cartResponse.statusCode != 200) {
+          if (cartResponse != null) {
+            print("Panier inexistant ou erreur (${cartResponse.statusCode}). Création d'un nouveau panier...");
+          } else {
+            print("Aucun panier courant. Création d'un nouveau panier...");
+          }
+
+          final newCartId = await createCart(1, 1); // Pour le test : u:1, shop:1
+
+          if (newCartId != null) {
+            currentCartId = newCartId;
+            await _saveCartId(currentCartId!);
+            print("Nouveau panier créé avec l'ID: $currentCartId");
+
+            // on ajoute le produit avec le nouveau panier
+            cartResponse = await addProductToCartInDB(product, currentCartId!);
+            if (cartResponse.statusCode == 200) {
+              print("Produit ajouté avec succès au nouveau panier !");
+            } else {
+              print("Echec final de l'ajout au panier.");
+            }
+          }
+        } else {
+          print("Produit ajouté avec succès au panier courant !");
+        }
       } else {
         print("Produit non trouvé, status: ${response.statusCode}");
       }
@@ -206,7 +291,9 @@ class ScanPageState extends State<ScanPage> {
           // on mets le bar code dans notre fonction pour le gérer
           scannedProduct(barcode.rawValue.toString());
           //on arrête la détection de barcode
-          controller?.stopImageStream();
+          if (controller?.value.isStreamingImages == true) {
+            controller?.stopImageStream();
+          }
         }
       }
     } catch (e) {
@@ -218,15 +305,22 @@ class ScanPageState extends State<ScanPage> {
 
   // on déclenche la détection du barcode, via le bouton
   void scanOnce() async {
+    if (controller?.value.isStreamingImages == true) return;
+
     controller?.startImageStream(processImageStream);
     await Future.delayed(const Duration(seconds: 5));
-    controller?.stopImageStream();
+
+    if (controller?.value.isStreamingImages == true) {
+      controller?.stopImageStream();
+    }
   }
 
   // on arrête le flux
   @override
   void dispose() {
-    controller?.stopImageStream();
+    if (controller?.value.isStreamingImages == true) {
+      controller?.stopImageStream();
+    }
     controller?.dispose();
     barcodeScanner.close();
     searchController.dispose();
@@ -381,7 +475,9 @@ class ScanPageState extends State<ScanPage> {
             label: const Text("Panier"),
           ),
           FloatingActionButton.extended(
-            onPressed: () {},
+            onPressed: () {
+              Navigator.pushNamed(context, '/validation');
+            },
             icon: const Icon(Icons.check),
             label: const Text("Valider"),
           ),

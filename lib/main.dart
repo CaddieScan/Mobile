@@ -7,6 +7,7 @@ import 'login_page.dart';
 import 'home_page.dart';
 import 'map_page.dart';
 import 'profile_page.dart';
+import 'validation_page.dart';
 
 void main() async {
   await dotenv.load(fileName: ".env");
@@ -30,6 +31,7 @@ class MyApp extends StatelessWidget {
         '/scan': (context) => const ScanPage(),
         '/cart_list': (context) => const CartListPage(),
         '/map': (context) => const MapPage(),
+        '/validation': (context) => const ValidationPage(),
       },
     );
   }

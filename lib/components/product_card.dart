@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../cart_list_page.dart';
 import '../models/product.dart';
 
 class ProductCard extends StatelessWidget {
@@ -25,11 +24,11 @@ class ProductCard extends StatelessWidget {
                     product.libelle,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  Text('Quantité: 1'),
+                  Text('Quantité: ${product.quantity}'),
                 ],
               ),
             ),
-            Text('${(product.price * 1).toStringAsFixed(2)}€'),
+            Text('${(product.price * product.quantity).toStringAsFixed(2)}€'),
           ],
         ),
       ),
