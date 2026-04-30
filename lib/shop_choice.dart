@@ -17,9 +17,10 @@ class ShopChoicePage extends StatefulWidget {
 
 class ShopChoicePageState extends State<ShopChoicePage> {
   late List<Shop> shops = [];
-  Map<int, dynamic> rawShopData = {}; // Pour stocker les données originelles des magasins
+  Map<int, dynamic> rawShopData = {};
 
-  void _saveFavorites(SharedPreferences prefs) {
+  // fonction qui sauvegarde les favoris dans le téléphone
+  void saveFavorites(SharedPreferences prefs) {
     List<dynamic> favsToSave = [];
     for (var s in shops.where((shop) => shop.isFavorite)) {
       if (rawShopData.containsKey(s.id)) {
@@ -49,9 +50,12 @@ class ShopChoicePageState extends State<ShopChoicePage> {
     bool serviceEnabled;
     LocationPermission permission;
 
+    // ici on regarde si la géoloc est activée
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      print('Les services de localisation sont désactivés.');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: const Text('Services de localisation désactivés'), backgroundColor: Colors.red),
+      );
       return;
     }
 
@@ -59,13 +63,17 @@ class ShopChoicePageState extends State<ShopChoicePage> {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        print('Les permissions de localisation sont refusées.');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: const Text('Permissions de localisation refusées'), backgroundColor: Colors.red),
+        );
         return;
       }
     }
     
     if (permission == LocationPermission.deniedForever) {
-      print('Les permissions de localisation sont refusées de façon permanente.');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: const Text('Permissions de localisation refusées'), backgroundColor: Colors.red),
+      );
       return;
     }
 
@@ -83,7 +91,9 @@ class ShopChoicePageState extends State<ShopChoicePage> {
             rawShopData[s.id] = item;
             shops.add(s);
           } catch (e) {
-            print("Erreur de chargement du favori: $e");
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Erreur chargement favori: $e'), backgroundColor: Colors.red),
+            );
           }
         }
         shops.sort((a, b) => a.km.compareTo(b.km));
@@ -119,11 +129,18 @@ class ShopChoicePageState extends State<ShopChoicePage> {
           shops = newShops;
           shops.sort((a, b) => a.km.compareTo(b.km));
 
-          _saveFavorites(prefs);
+          // sauvegarder les favoris
+          saveFavorites(prefs);
         });
       } else {
-        print("Magasins non trouvés, status: ${response.statusCode}");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur magasins (HTTP ${response.statusCode})'), backgroundColor: Colors.red),
+        );
       }
+    }).catchError((e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur réseau: $e'), backgroundColor: Colors.red),
+      );
     });
   }
 
@@ -140,7 +157,7 @@ class ShopChoicePageState extends State<ShopChoicePage> {
 
     setState(() {
       shop.isFavorite = !shop.isFavorite;
-      _saveFavorites(prefs); // On écrase avec la nouvelle liste de favoris
+      saveFavorites(prefs); // On écrase avec la nouvelle liste de favoris
     });
 
     if (shop.isFavorite) {
@@ -154,10 +171,14 @@ class ShopChoicePageState extends State<ShopChoicePage> {
           }),
         );
         if (response.statusCode != 200) {
-          print("Erreur lors de l'ajout aux favoris: ${response.statusCode}");
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur ajout favoris (${response.statusCode})'), backgroundColor: Colors.red),
+          );
         }
       } catch (e) {
-        print("Erreur de connexion API favoris: $e");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur connexion API: $e'), backgroundColor: Colors.red),
+        );
       }
     }
   }

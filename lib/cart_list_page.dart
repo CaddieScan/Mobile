@@ -18,7 +18,6 @@ class CartListPage extends StatefulWidget {
 class CartListPageState extends State<CartListPage> {
   final List<Product> cartItems = [];
   bool isLoading = true;
-  String? errorMessage;
 
   @override
   void initState() {
@@ -26,10 +25,10 @@ class CartListPageState extends State<CartListPage> {
     loadCartProducts();
   }
 
+  // on charge tous les produits du panier en cours
   Future<void> loadCartProducts() async {
     setState(() {
       isLoading = true;
-      errorMessage = null;
     });
 
     try {
@@ -38,9 +37,11 @@ class CartListPageState extends State<CartListPage> {
       if (cartId == null) {
         setState(() {
           cartItems.clear();
-          errorMessage = 'Aucun panier en cours.';
           isLoading = false;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: const Text('Aucun panier en cours'), backgroundColor: Colors.red),
+        );
         return;
       }
 
@@ -67,18 +68,25 @@ class CartListPageState extends State<CartListPage> {
 
       if (response.statusCode == 404) {
         await CartService.clearCartId();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: const Text('Panier non trouvé'), backgroundColor: Colors.red),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur (HTTP ${response.statusCode})'), backgroundColor: Colors.red),
+        );
       }
 
       setState(() {
         isLoading = false;
-        errorMessage =
-            'Impossible de charger le panier (HTTP ${response.statusCode}).';
       });
     } catch (e) {
       setState(() {
         isLoading = false;
-        errorMessage = 'Erreur réseau: $e';
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur réseau: $e'), backgroundColor: Colors.red),
+      );
     }
   }
 
@@ -106,26 +114,17 @@ class CartListPageState extends State<CartListPage> {
           ),
         ],
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            if (errorMessage != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(
-                  errorMessage!,
-                  style: const TextStyle(color: Colors.red),
-                ),
-              ),
-
-            if (!isLoading && errorMessage == null && cartItems.isEmpty)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 12),
-                child: Text('Votre panier est vide.'),
-              ),
+       body: isLoading
+           ? const Center(child: CircularProgressIndicator())
+           : SingleChildScrollView(
+         padding: const EdgeInsets.all(16.0),
+         child: Column(
+           children: [
+             if (!isLoading && cartItems.isEmpty)
+               const Padding(
+                 padding: EdgeInsets.only(bottom: 12),
+                 child: Text('Votre panier est vide.'),
+               ),
 
             // liste des produits
             ListView.builder(

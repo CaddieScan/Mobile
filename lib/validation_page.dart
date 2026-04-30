@@ -36,7 +36,6 @@ class ValidationPage extends StatelessWidget {
                 width: double.infinity,
                 color: Colors.black12,
                 alignment: Alignment.center,
-                child: const Text('Code-barres (placeholder)'),
               ),
               const SizedBox(height: 40),
               ElevatedButton(
