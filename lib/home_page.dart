@@ -27,6 +27,7 @@ class HomePageState extends State<HomePage> {
     visitsFuture = fetchUserVisits();
   }
 
+  // on récupère les paniers de l'utilisateur
   Future<List<Map<String, dynamic>>> fetchUserCarts() async {
     try {
       final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
@@ -40,6 +41,7 @@ class HomePageState extends State<HomePage> {
     }
   }
 
+  // on récupère le nombre de visites de l'utilisateur par magasin (via le nombre de paniers par magasin)
   Future<List<Map<String, dynamic>>> fetchUserVisits() async {
     try {
       final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';

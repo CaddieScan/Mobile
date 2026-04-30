@@ -27,6 +27,9 @@ class ScanPageState extends State<ScanPage> {
   List<Product> allProducts = [];
   List<Product> searchResults = [];
 
+  // message d'erreur
+  String? scanErrorMessage;
+
   final List<Promotion> promotions = [
     Promotion(
       id: 1,
@@ -82,6 +85,14 @@ class ScanPageState extends State<ScanPage> {
     loadCartId();
   }
 
+  void showToast(String message) {
+    print(message);
+    if (!mounted) return;
+    setState(() {
+      scanErrorMessage = message;
+    });
+  }
+
   // charger l'id du panier depuis le stockage local
   Future<void> loadCartId() async {
     try {
@@ -90,25 +101,18 @@ class ScanPageState extends State<ScanPage> {
         setState(() {
           currentCartId = savedId;
         });
-        print('ID panier chargé depuis SharedPreferences: $currentCartId');
-      } else {
-        print('Aucun ID panier trouvé en local');
       }
     } catch (e) {
-      print('Erreur lors du chargement de l\'ID panier: $e');
+      showToast('Erreur chargement panier: $e');
     }
   }
 
-  Future<void> _saveCartId(int id) async {
+  Future<void> saveCartId(int id) async {
     await CartService.setCartId(id);
-    if (mounted) {
-      print('ID panier enregistré en local: $id');
-    }
   }
 
   // récupérer les produits du magasin
   Future<void> fetchProducts() async {
-    print("Récupération des produits en cours...");
     try {
       String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
       final response = await http.get(
@@ -121,20 +125,20 @@ class ScanPageState extends State<ScanPage> {
         final List<dynamic> jsonData = jsonDecode(response.body);
         setState(() {
           allProducts = jsonData.map((data) => Product.fromJson(data)).toList();
-          print("Produits récupérés : ${allProducts.length}");
+          scanErrorMessage = null;
         });
       } else {
-        print("Erreur HTTP ${response.statusCode}");
+        if (!mounted) return;
+        showToast('Erreur chargement produits (${response.statusCode})');
       }
     } catch (e) {
-      print("Erreur lors de la récupération des produits: $e");
+      if (!mounted) return;
+      showToast('Erreur réseau: $e');
     }
   }
 
   // filtrer les produits de la recherche
   void updateSearchResults(String query) {
-    print("Recherche : $query");
-    print("Produits : ${allProducts}");
     if (query.isEmpty) {
       setState(() => searchResults = []);
       return;
@@ -147,7 +151,6 @@ class ScanPageState extends State<ScanPage> {
           )
           .toList();
     });
-    print("Produits trouvés : ${searchResults.length}");
   }
 
   // requête de recherche du produit par son code-barre
@@ -191,7 +194,8 @@ class ScanPageState extends State<ScanPage> {
         return data['id'] as int;
       }
     } catch (e) {
-      print("Erreur création panier dynamique: $e");
+      if (!mounted) return null;
+      showToast('Erreur création panier: $e');
     }
     return null;
   }
@@ -201,51 +205,37 @@ class ScanPageState extends State<ScanPage> {
       final response = await fetchScan(barcode);
 
       if (response.statusCode == 200) {
-        // décoder le json
         final product = Product.fromJson(jsonDecode(response.body));
         setState(() {
           scannedProductDatas = product;
         });
-        print("PRODUIT SCANNE : ${product.libelle} - ${product.price}");
-        
+
         http.Response? cartResponse;
 
-        // on tente d'ajouter au panier courant s'il existe déjà
         if (currentCartId != null) {
           cartResponse = await addProductToCartInDB(product, currentCartId!);
         }
 
-        // si pas de panier courant ou si ajout en échec, on crée un nouveau panier
         if (cartResponse == null || cartResponse.statusCode != 200) {
-          if (cartResponse != null) {
-            print("Panier inexistant ou erreur (${cartResponse.statusCode}). Création d'un nouveau panier...");
-          } else {
-            print("Aucun panier courant. Création d'un nouveau panier...");
-          }
-
-          final newCartId = await createCart(1, 1); // Pour le test : u:1, shop:1
+          final newCartId = await createCart(1, 1);
 
           if (newCartId != null) {
             currentCartId = newCartId;
-            await _saveCartId(currentCartId!);
-            print("Nouveau panier créé avec l'ID: $currentCartId");
+            await saveCartId(currentCartId!);
 
-            // on ajoute le produit avec le nouveau panier
             cartResponse = await addProductToCartInDB(product, currentCartId!);
-            if (cartResponse.statusCode == 200) {
-              print("Produit ajouté avec succès au nouveau panier !");
-            } else {
-              print("Echec final de l'ajout au panier.");
+            if (cartResponse.statusCode != 200) {
+              showToast('Erreur ajout produit au panier');
             }
+          } else {
+            showToast('Erreur création panier');
           }
-        } else {
-          print("Produit ajouté avec succès au panier courant !");
         }
       } else {
-        print("Produit non trouvé, status: ${response.statusCode}");
+        showToast('Produit non trouvé');
       }
     } catch (e) {
-      print("Erreur réseau: $e");
+      showToast('Erreur réseau: $e');
     }
   }
 
@@ -262,7 +252,6 @@ class ScanPageState extends State<ScanPage> {
 
   // analyse du flux image pour détecter un barcode
   Future<void> processImageStream(CameraImage image) async {
-    // si c'est déja en process, ignorer
     if (isProcessing) return;
 
     isProcessing = true;
@@ -297,7 +286,9 @@ class ScanPageState extends State<ScanPage> {
         }
       }
     } catch (e) {
-      print("Erreur lors de l'analyse de l'image: $e");
+      if (!mounted) return;
+      showToast('Erreur scan image: $e');
+
     }
 
     isProcessing = false;
@@ -306,6 +297,10 @@ class ScanPageState extends State<ScanPage> {
   // on déclenche la détection du barcode, via le bouton
   void scanOnce() async {
     if (controller?.value.isStreamingImages == true) return;
+
+    setState(() {
+      scanErrorMessage = null;
+    });
 
     controller?.startImageStream(processImageStream);
     await Future.delayed(const Duration(seconds: 5));
@@ -450,6 +445,14 @@ class ScanPageState extends State<ScanPage> {
                   onPressed: scanOnce,
                   child: const Text("Scanner"),
                 ),
+                if (scanErrorMessage != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    scanErrorMessage!,
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
                 const SizedBox(height: 24),
                 Row(
                   children: [buildDisplayLastProduct(context), const Spacer()],
