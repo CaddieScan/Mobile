@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:caddiescan/models/product.dart';
@@ -27,7 +28,6 @@ class ScanPageState extends State<ScanPage> {
   List<Product> allProducts = [];
   List<Product> searchResults = [];
 
-  // message d'erreur
   String? scanErrorMessage;
 
   final List<Promotion> promotions = [
@@ -93,7 +93,6 @@ class ScanPageState extends State<ScanPage> {
     });
   }
 
-  // charger l'id du panier depuis le stockage local
   Future<void> loadCartId() async {
     try {
       final savedId = await CartService.getCartId();
@@ -111,16 +110,12 @@ class ScanPageState extends State<ScanPage> {
     await CartService.setCartId(id);
   }
 
-  // récupérer les produits du magasin
   Future<void> fetchProducts() async {
     try {
       String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
       final response = await http.get(
-        Uri.parse(
-          '$baseUrl/product/get_products_by_shopid?shop_id=1',
-        ),
+        Uri.parse('$baseUrl/product/get_products_by_shopid?shop_id=1'),
       );
-
       if (response.statusCode == 200) {
         final List<dynamic> jsonData = jsonDecode(response.body);
         setState(() {
@@ -128,16 +123,13 @@ class ScanPageState extends State<ScanPage> {
           scanErrorMessage = null;
         });
       } else {
-        if (!mounted) return;
         showToast('Erreur chargement produits (${response.statusCode})');
       }
     } catch (e) {
-      if (!mounted) return;
       showToast('Erreur réseau: $e');
     }
   }
 
-  // filtrer les produits de la recherche
   void updateSearchResults(String query) {
     if (query.isEmpty) {
       setState(() => searchResults = []);
@@ -145,25 +137,18 @@ class ScanPageState extends State<ScanPage> {
     }
     setState(() {
       searchResults = allProducts
-          .where(
-            (product) =>
-                product.libelle.toLowerCase().contains(query.toLowerCase()),
-          )
+          .where((p) => p.libelle.toLowerCase().contains(query.toLowerCase()))
           .toList();
     });
   }
 
-  // requête de recherche du produit par son code-barre
-  Future<http.Response> fetchScan(barcode) {
+  Future<http.Response> fetchScan(String barcode) {
     String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
     return http.get(
-      Uri.parse(
-        '$baseUrl/product/get_product_by_barcode?barcode=${barcode}',
-      ),
+      Uri.parse('$baseUrl/product/get_product_by_barcode?barcode=$barcode'),
     );
   }
 
-  // requête d'ajout du produit dans le panier
   Future<http.Response> addProductToCartInDB(Product product, int cartId) {
     String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
     return http.post(
@@ -177,64 +162,83 @@ class ScanPageState extends State<ScanPage> {
     );
   }
 
-  // création d'un nouveau panier
   Future<int?> createCart(int userId, int shopId) async {
+    print("Creating cart for user $userId in shop $shopId");
     String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
     try {
-      final response = await http.post(
+      final response = await http
+          .post(
         Uri.parse('$baseUrl/cart/'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'user_id': userId,
-          'shop_id': shopId,
-        }),
-      );
-      if (response.statusCode == 200) {
+        body: jsonEncode({'user_id': userId, 'shop_id': shopId}),
+      )
+          .timeout(const Duration(seconds: 60));
+
+      print("createCart status: ${response.statusCode}");
+      print("createCart body: ${response.body}");
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
         final data = jsonDecode(response.body);
-        return data['id'] as int;
+        return (data['id'] as num).toInt();
       }
-    } catch (e) {
-      if (!mounted) return null;
+      showToast('Erreur création panier (${response.statusCode})');
+    } on TimeoutException {
+      showToast('Serveur indisponible, réessaie dans quelques secondes');
+    } catch (e, stack) {
+      print("Exception createCart: $e\n$stack");
       showToast('Erreur création panier: $e');
     }
     return null;
   }
 
-  void scannedProduct(String barcode) async {
+  Future<void> scannedProduct(String barcode) async {
     try {
       final response = await fetchScan(barcode);
+      print("fetchScan status: ${response.statusCode}");
 
-      if (response.statusCode == 200) {
-        final product = Product.fromJson(jsonDecode(response.body));
-        setState(() {
-          scannedProductDatas = product;
-        });
-
-        http.Response? cartResponse;
-
-        if (currentCartId != null) {
-          cartResponse = await addProductToCartInDB(product, currentCartId!);
-        }
-
-        if (cartResponse == null || cartResponse.statusCode != 200) {
-          final newCartId = await createCart(1, 1);
-
-          if (newCartId != null) {
-            currentCartId = newCartId;
-            await saveCartId(currentCartId!);
-
-            cartResponse = await addProductToCartInDB(product, currentCartId!);
-            if (cartResponse.statusCode != 200) {
-              showToast('Erreur ajout produit au panier');
-            }
-          } else {
-            showToast('Erreur création panier');
-          }
-        }
-      } else {
+      if (response.statusCode != 200) {
         showToast('Produit non trouvé');
+        return;
       }
-    } catch (e) {
+
+      final product = Product.fromJson(jsonDecode(response.body));
+      setState(() {
+        scannedProductDatas = product;
+      });
+
+      // Créer un panier si on n'en a pas
+      if (currentCartId == null) {
+        print("Pas de panier, création...");
+        final newCartId = await createCart(1, 1);
+        if (newCartId == null) {
+          showToast('Impossible de créer un panier');
+          return;
+        }
+        currentCartId = newCartId;
+        await saveCartId(currentCartId!);
+      }
+
+      // Ajouter le produit au panier
+      final cartResponse = await addProductToCartInDB(product, currentCartId!);
+      print("addProduct status: ${cartResponse.statusCode}");
+      print("addProduct body: ${cartResponse.body}");
+
+      if (cartResponse.statusCode == 200) {
+        setState(() => scanErrorMessage = null);
+      } else if (cartResponse.statusCode == 404 ||
+          cartResponse.statusCode == 422) {
+        // Le panier n'existe plus en base, on recrée
+        print("Panier introuvable en base, recréation...");
+        currentCartId = null;
+        await CartService.setCartId(null);
+        await scannedProduct(barcode); // relance récursive
+      } else {
+        showToast(
+          'Erreur ajout produit (${cartResponse.statusCode}): ${cartResponse.body}',
+        );
+      }
+    } catch (e, stack) {
+      print("Erreur scannedProduct: $e\n$stack");
       showToast('Erreur réseau: $e');
     }
   }
@@ -250,14 +254,11 @@ class ScanPageState extends State<ScanPage> {
     if (mounted) setState(() {});
   }
 
-  // analyse du flux image pour détecter un barcode
   Future<void> processImageStream(CameraImage image) async {
     if (isProcessing) return;
-
     isProcessing = true;
 
     try {
-      // on gère le scan via les images
       final WriteBuffer allBytes = WriteBuffer();
       for (final Plane plane in image.planes) {
         allBytes.putUint8List(plane.bytes);
@@ -272,35 +273,26 @@ class ScanPageState extends State<ScanPage> {
       );
 
       final inputImage = InputImage.fromBytes(bytes: bytes, metadata: metadata);
-
       final barcodes = await barcodeScanner.processImage(inputImage);
 
       for (final barcode in barcodes) {
         if (barcode.rawValue != null) {
-          // on mets le bar code dans notre fonction pour le gérer
-          scannedProduct(barcode.rawValue.toString());
-          //on arrête la détection de barcode
+          await scannedProduct(barcode.rawValue.toString());
           if (controller?.value.isStreamingImages == true) {
             controller?.stopImageStream();
           }
         }
       }
     } catch (e) {
-      if (!mounted) return;
       showToast('Erreur scan image: $e');
-
     }
 
     isProcessing = false;
   }
 
-  // on déclenche la détection du barcode, via le bouton
   void scanOnce() async {
     if (controller?.value.isStreamingImages == true) return;
-
-    setState(() {
-      scanErrorMessage = null;
-    });
+    setState(() => scanErrorMessage = null);
 
     controller?.startImageStream(processImageStream);
     await Future.delayed(const Duration(seconds: 5));
@@ -310,7 +302,6 @@ class ScanPageState extends State<ScanPage> {
     }
   }
 
-  // on arrête le flux
   @override
   void dispose() {
     if (controller?.value.isStreamingImages == true) {
@@ -322,7 +313,6 @@ class ScanPageState extends State<ScanPage> {
     super.dispose();
   }
 
-  // composant de la preview de la caméra
   Widget buildCameraPreview() {
     if (controller == null || !controller!.value.isInitialized) {
       return const SizedBox(
@@ -339,7 +329,6 @@ class ScanPageState extends State<ScanPage> {
     );
   }
 
-  // composant des promotions
   Widget buildPromotionsGrid() {
     return GridView.builder(
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -384,11 +373,10 @@ class ScanPageState extends State<ScanPage> {
     try {
       return Text("Dernier produit : ${scannedProductDatas.libelle}");
     } catch (e) {
-      return Text("Dernier produit :");
+      return const Text("Dernier produit :");
     }
   }
 
-  // composant pour la liste des résultats de recherche
   Widget buildSearchResultsList() {
     return Container(
       color: Colors.white,
@@ -416,7 +404,6 @@ class ScanPageState extends State<ScanPage> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
-        // l'input de recherche
         title: TextField(
           controller: searchController,
           onChanged: updateSearchResults,
@@ -426,7 +413,6 @@ class ScanPageState extends State<ScanPage> {
           ),
         ),
         actions: [
-          // bouton qui efface la recherche
           IconButton(
             icon: const Icon(Icons.clear),
             onPressed: () => searchController.clear(),
@@ -471,16 +457,14 @@ class ScanPageState extends State<ScanPage> {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           FloatingActionButton.extended(
-            onPressed: () {
-              Navigator.pushNamed(context, '/cart_list');
-            },
+            heroTag: 'scan_cart',
+            onPressed: () => Navigator.pushNamed(context, '/cart_list'),
             icon: const Icon(Icons.shopping_cart_checkout),
             label: const Text("Panier"),
           ),
           FloatingActionButton.extended(
-            onPressed: () {
-              Navigator.pushNamed(context, '/validation');
-            },
+            heroTag: 'scan_validate',
+            onPressed: () => Navigator.pushNamed(context, '/validation'),
             icon: const Icon(Icons.check),
             label: const Text("Valider"),
           ),

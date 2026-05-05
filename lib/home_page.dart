@@ -27,16 +27,32 @@ class HomePageState extends State<HomePage> {
     visitsFuture = fetchUserVisits();
   }
 
+  // fonction qui regroupe tous les affichages de Toast
+  void showToast(String message) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      if (messenger == null) return;
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.red),
+      );
+    });
+  }
+
   // on récupère les paniers de l'utilisateur
   Future<List<Map<String, dynamic>>> fetchUserCarts() async {
     try {
       final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
       final response = await http.get(Uri.parse('$baseUrl/cart/user/1'));
-      if (response.statusCode != 200) return [];
+      if (response.statusCode != 200) {
+        showToast('Erreur chargement achats (HTTP ${response.statusCode})');
+        return [];
+      }
       return (jsonDecode(response.body) as List)
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList();
-    } catch (_) {
+    } catch (e) {
+      showToast('Erreur réseau achats: $e');
       return [];
     }
   }
@@ -46,11 +62,15 @@ class HomePageState extends State<HomePage> {
     try {
       final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
       final response = await http.get(Uri.parse('$baseUrl/cart/user/1/visites'));
-      if (response.statusCode != 200) return [];
+      if (response.statusCode != 200) {
+        showToast('Erreur chargement visites (HTTP ${response.statusCode})');
+        return [];
+      }
       return (jsonDecode(response.body) as List)
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList();
-    } catch (_) {
+    } catch (e) {
+      showToast('Erreur réseau visites: $e');
       return [];
     }
   }
@@ -95,6 +115,7 @@ class HomePageState extends State<HomePage> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'home_shop_choice',
         onPressed: () => Navigator.pushNamed(context, '/shop_choice'),
         label: const Text(
           'Choisir un magasin',

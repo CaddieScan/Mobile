@@ -8,9 +8,13 @@ class CartService {
     return prefs.getInt(_cartIdKey);
   }
 
-  static Future<void> setCartId(int id) async {
+  static Future<void> setCartId(int? id) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_cartIdKey, id);
+    if (id == null) {
+      await prefs.remove(_cartIdKey);
+    } else {
+      await prefs.setInt(_cartIdKey, id);
+    }
   }
 
   static Future<void> clearCartId() async {
@@ -18,4 +22,3 @@ class CartService {
     await prefs.remove(_cartIdKey);
   }
 }
-
