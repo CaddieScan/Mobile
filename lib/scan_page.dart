@@ -425,8 +425,8 @@ class ScanPageState extends State<ScanPage> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.clear),
-            onPressed: () => searchController.clear(),
+            icon: const Icon(Icons.map),
+            onPressed: () => Navigator.pushNamed(context, '/map'),
           ),
         ],
       ),
