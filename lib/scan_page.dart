@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:caddiescan/models/product.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +9,8 @@ import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'components/section_header.dart';
+import 'components/product_search_list.dart';
+import 'models/product.dart';
 import 'services/cart_service.dart';
 import 'models/promotions.dart';
 
@@ -86,6 +87,25 @@ class ScanPageState extends State<ScanPage> {
     loadShopId();
     fetchProducts();
     loadCartId();
+    searchController.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    final query = searchController.text;
+    if (query.isEmpty) {
+      setState(() => searchResults = []);
+      return;
+    }
+    setState(() {
+      searchResults = allProducts
+          .where((p) => p.name.toLowerCase().contains(query.toLowerCase()))
+          .toList();
+    });
+  }
+
+  void _onProductTap(Product product) {
+    Navigator.pushNamed(context, '/map');
+    searchController.clear();
   }
 
   void showToast(String message) {
@@ -128,14 +148,19 @@ class ScanPageState extends State<ScanPage> {
 
   Future<void> fetchProducts() async {
     try {
-      String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
+      String baseUrl =
+          dotenv.env['API_BASE_URL'] ?? 'https://back-k1ee.onrender.com/api';
+
       final response = await http.get(
-        Uri.parse('$baseUrl/product/get_products_by_shopid?shop_id=1'),
+        Uri.parse('$baseUrl/api/stores/1/products'),
       );
+
       if (response.statusCode == 200) {
         final List<dynamic> jsonData = jsonDecode(response.body);
+
         setState(() {
-          allProducts = jsonData.map((data) => Product.fromJson(data)).toList();
+          allProducts =
+              jsonData.map((data) => Product.fromJson(data)).toList();
           scanErrorMessage = null;
         });
       } else {
@@ -146,33 +171,25 @@ class ScanPageState extends State<ScanPage> {
     }
   }
 
-  void updateSearchResults(String query) {
-    if (query.isEmpty) {
-      setState(() => searchResults = []);
-      return;
-    }
-    setState(() {
-      searchResults = allProducts
-          .where((p) => p.libelle.toLowerCase().contains(query.toLowerCase()))
-          .toList();
-    });
-  }
-
   Future<http.Response> fetchScan(String barcode) {
-    String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
+    String baseUrl =
+        dotenv.env['API_BASE_URL'] ?? 'https://back-k1ee.onrender.com/api';
+
     return http.get(
       Uri.parse('$baseUrl/product/get_product_by_barcode?barcode=$barcode'),
     );
   }
 
   Future<http.Response> addProductToCartInDB(Product product, int cartId) {
-    String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
+    String baseUrl =
+        dotenv.env['API_BASE_URL'] ?? 'https://back-k1ee.onrender.com/api';
+
     return http.post(
       Uri.parse('$baseUrl/cart/product/'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'cart_id': cartId,
-        'produit_id': product.barcode,
+        'produit_id': product.id,
         'quantity': 1,
       }),
     );
@@ -180,7 +197,9 @@ class ScanPageState extends State<ScanPage> {
 
   Future<int?> createCart(int userId, int shopId) async {
     print("Creating cart for user $userId in shop $shopId");
-    String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
+    String baseUrl =
+        dotenv.env['API_BASE_URL'] ?? 'https://back-k1ee.onrender.com/api';
+
     try {
       final response = await http
           .post(
@@ -197,9 +216,8 @@ class ScanPageState extends State<ScanPage> {
         final data = jsonDecode(response.body);
         return (data['id'] as num).toInt();
       }
+
       showToast('Erreur création panier (${response.statusCode})');
-    } on TimeoutException {
-      showToast('Serveur indisponible, réessaie dans quelques secondes');
     } catch (e, stack) {
       print("Exception createCart: $e\n$stack");
       showToast('Erreur création panier: $e');
@@ -211,6 +229,7 @@ class ScanPageState extends State<ScanPage> {
     try {
       final response = await fetchScan(barcode);
       print("fetchScan status: ${response.statusCode}");
+      print("fetchScan body: ${response.body}");
 
       if (response.statusCode != 200) {
         showToast('Produit non trouvé');
@@ -218,41 +237,41 @@ class ScanPageState extends State<ScanPage> {
       }
 
       final product = Product.fromJson(jsonDecode(response.body));
+
       setState(() {
         scannedProductDatas = product;
       });
 
-      // Créer un panier si on n'en a pas
       if (currentCartId == null) {
         print("Pas de panier, création...");
         final newCartId = await createCart(1, currentShopId!);
+
         if (newCartId == null) {
           showToast('Impossible de créer un panier');
           return;
         }
+
         currentCartId = newCartId;
         await saveCartId(currentCartId!);
       }
 
-      // Ajouter le produit au panier
       final cartResponse = await addProductToCartInDB(product, currentCartId!);
+
       print("addProduct status: ${cartResponse.statusCode}");
       print("addProduct body: ${cartResponse.body}");
 
       if (cartResponse.statusCode == 200) {
         setState(() => scanErrorMessage = null);
-      } else if (cartResponse.statusCode == 404 ||
-          cartResponse.statusCode == 422) {
-        // Le panier n'existe plus en base, on recrée
-        print("Panier introuvable en base, recréation...");
+        return;
+      }
+
+      if (cartResponse.statusCode == 404 || cartResponse.statusCode == 422) {
         currentCartId = null;
         await CartService.setCartId(null);
-        await scannedProduct(barcode); // relance récursive
-      } else {
-        showToast(
-          'Erreur ajout produit (${cartResponse.statusCode}): ${cartResponse.body}',
-        );
+        return;
       }
+
+      showToast('Erreur ajout produit (${cartResponse.statusCode})');
     } catch (e, stack) {
       print("Erreur scannedProduct: $e\n$stack");
       showToast('Erreur réseau: $e');
@@ -288,7 +307,9 @@ class ScanPageState extends State<ScanPage> {
         bytesPerRow: image.planes.first.bytesPerRow,
       );
 
-      final inputImage = InputImage.fromBytes(bytes: bytes, metadata: metadata);
+      final inputImage =
+      InputImage.fromBytes(bytes: bytes, metadata: metadata);
+
       final barcodes = await barcodeScanner.processImage(inputImage);
 
       for (final barcode in barcodes) {
@@ -320,9 +341,7 @@ class ScanPageState extends State<ScanPage> {
 
   @override
   void dispose() {
-    if (controller?.value.isStreamingImages == true) {
-      controller?.stopImageStream();
-    }
+    searchController.removeListener(_onSearchChanged);
     controller?.dispose();
     barcodeScanner.close();
     searchController.dispose();
@@ -367,17 +386,13 @@ class ScanPageState extends State<ScanPage> {
             children: [
               const Icon(Icons.campaign, size: 40, color: Colors.blueAccent),
               const SizedBox(height: 8),
-              Text(
-                p.libelle,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
+              Text(p.libelle,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis),
               const SizedBox(height: 4),
-              Text(
-                "-${p.pourcentageReduction ?? 0}%",
-                style: const TextStyle(color: Colors.red),
-              ),
+              Text("-${p.pourcentageReduction ?? 0}%",
+                  style: const TextStyle(color: Colors.red)),
             ],
           ),
         );
@@ -387,29 +402,10 @@ class ScanPageState extends State<ScanPage> {
 
   Widget buildDisplayLastProduct(BuildContext context) {
     try {
-      return Text("Dernier produit : ${scannedProductDatas.libelle}");
+      return Text("Dernier produit : ${scannedProductDatas.name}");
     } catch (e) {
       return const Text("Dernier produit :");
     }
-  }
-
-  Widget buildSearchResultsList() {
-    return Container(
-      color: Colors.white,
-      child: ListView.builder(
-        itemCount: searchResults.length,
-        itemBuilder: (context, index) {
-          final product = searchResults[index];
-          return ListTile(
-            title: Text(product.libelle),
-            onTap: () {
-              Navigator.pushNamed(context, '/map');
-              searchController.clear();
-            },
-          );
-        },
-      ),
-    );
   }
 
   @override
@@ -422,7 +418,6 @@ class ScanPageState extends State<ScanPage> {
         ),
         title: TextField(
           controller: searchController,
-          onChanged: updateSearchResults,
           decoration: const InputDecoration(
             hintText: 'Rechercher un produit...',
             border: InputBorder.none,
@@ -449,15 +444,16 @@ class ScanPageState extends State<ScanPage> {
                 ),
                 if (scanErrorMessage != null) ...[
                   const SizedBox(height: 8),
-                  Text(
-                    scanErrorMessage!,
-                    style: const TextStyle(color: Colors.red),
-                    textAlign: TextAlign.center,
-                  ),
+                  Text(scanErrorMessage!,
+                      style: const TextStyle(color: Colors.red),
+                      textAlign: TextAlign.center),
                 ],
                 const SizedBox(height: 24),
                 Row(
-                  children: [buildDisplayLastProduct(context), const Spacer()],
+                  children: [
+                    buildDisplayLastProduct(context),
+                    const Spacer()
+                  ],
                 ),
                 const SectionHeader(title: 'Promotions suggérées'),
                 const SizedBox(height: 16),
@@ -466,7 +462,10 @@ class ScanPageState extends State<ScanPage> {
               ],
             ),
           ),
-          if (searchResults.isNotEmpty) buildSearchResultsList(),
+          ProductSearchList(
+            results: searchResults,
+            onProductTap: _onProductTap,
+          ),
         ],
       ),
       floatingActionButton: Row(
