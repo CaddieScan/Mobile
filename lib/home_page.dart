@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'services/cart_service.dart';
 import 'components/section_header.dart';
 import 'components/fidelity_card.dart';
 import 'components/purchase_item.dart';
 import 'components/visit_item.dart';
+
+late SharedPreferences prefs;
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -25,6 +28,7 @@ class HomePageState extends State<HomePage> {
     CartService.clearCartId();
     purchasesFuture = fetchUserCarts();
     visitsFuture = fetchUserVisits();
+    SharedPreferences.getInstance().then((p) => prefs = p);
   }
 
   // fonction qui regroupe tous les affichages de Toast
@@ -154,6 +158,10 @@ class HomePageState extends State<HomePage> {
               store: store,
               amount: '${total.toStringAsFixed(2)}€',
               icon: Icons.storefront,
+              onPressed: () {
+                CartService.setCartId(p['id']);
+                Navigator.pushNamed(context, '/cart_list');
+              },
             );
           }).toList(),
         );
@@ -183,11 +191,18 @@ class HomePageState extends State<HomePage> {
             final location = v['magasin_libelle']?.toString() ?? '';
             final count = (v['nombre_visites'] as num?)?.toInt() ?? 0;
             final label = count == 1 ? '1 visite' : '$count visites';
+            final id = v['magasin_id']?.toInt() ?? '';
+
 
             return VisitItem(
+              id: id,
               location: location,
               visits: label,
               icon: Icons.storefront,
+              onPressed: () {
+                prefs.setString('current_shop_id_scan', id.toString());
+                Navigator.pushNamed(context, '/scan');
+              },
             );
           }).toList(),
         );

@@ -8,11 +8,15 @@ import 'components/section_header.dart';
 import 'components/shop_choice_card.dart';
 import 'models/shop.dart';
 
+late SharedPreferences prefs;
+
 class ShopChoicePage extends StatefulWidget {
   const ShopChoicePage({super.key});
 
   @override
   State<ShopChoicePage> createState() => ShopChoicePageState();
+
+
 }
 
 class ShopChoicePageState extends State<ShopChoicePage> {
@@ -149,6 +153,7 @@ class ShopChoicePageState extends State<ShopChoicePage> {
     super.initState();
     initShopList();
     shops.sort((a, b) => a.km.compareTo(b.km));
+    SharedPreferences.getInstance().then((p) => prefs = p);
   }
 
   void toggleFavorite(int index) async {
@@ -243,6 +248,7 @@ class ShopChoicePageState extends State<ShopChoicePage> {
                         isFavorite: shops[i].isFavorite,
                         onFavoritePressed: () => toggleFavorite(i),
                         onPressed: () {
+                          prefs.setString('current_shop_id_scan', shops[i].id.toString());
                           Navigator.pushNamed(context, '/scan');
                         },
                       ),
