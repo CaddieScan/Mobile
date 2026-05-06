@@ -8,6 +8,7 @@ import 'components/section_header.dart';
 import 'components/fidelity_card.dart';
 import 'components/purchase_item.dart';
 import 'components/visit_item.dart';
+import 'components/add_fidelity_card_dialog.dart';
 
 late SharedPreferences prefs;
 
@@ -21,6 +22,7 @@ class HomePage extends StatefulWidget {
 class HomePageState extends State<HomePage> {
   late Future<List<Map<String, dynamic>>> purchasesFuture;
   late Future<List<Map<String, dynamic>>> visitsFuture;
+  late Future<List<Map<String, dynamic>>> fidelityCardsFuture;
 
   @override
   void initState() {
@@ -28,6 +30,7 @@ class HomePageState extends State<HomePage> {
     CartService.clearCartId();
     purchasesFuture = fetchUserCarts();
     visitsFuture = fetchUserVisits();
+    fidelityCardsFuture = fetchFidelityCards();
     SharedPreferences.getInstance().then((p) => prefs = p);
   }
 
@@ -79,6 +82,35 @@ class HomePageState extends State<HomePage> {
     }
   }
 
+  // on récupère les cartes de fidélité de l'utilisateur
+  Future<List<Map<String, dynamic>>> fetchFidelityCards() async {
+    try {
+      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
+      final response = await http.get(Uri.parse('$baseUrl/fidelity/user/1'));
+      if (response.statusCode != 200) {
+        showToast('Erreur chargement cartes (HTTP ${response.statusCode})');
+        return [];
+      }
+      return (jsonDecode(response.body) as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    } catch (e) {
+      showToast('Erreur réseau cartes: $e');
+      return [];
+    }
+  }
+
+  // on ouvre la popup et on actualise la liste si une carte a été ajoutée
+  void openAddFidelityCardDialog() async {
+    final added = await showDialog<bool>(
+      context: context,
+      builder: (context) => const AddFidelityCardDialog(),
+    );
+    if (added == true) {
+      setState(() => fidelityCardsFuture = fetchFidelityCards());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -106,8 +138,8 @@ class HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SectionHeader(title: 'Cartes de fidélité', onAdd: () {}),
-            const FidelityCard(),
+            SectionHeader(title: 'Cartes de fidélité', onAdd: openAddFidelityCardDialog),
+            buildFidelityCardList(),
             const SizedBox(height: 24),
             const SectionHeader(title: 'Derniers achats'),
             buildPurchaseList(),
@@ -130,6 +162,33 @@ class HomePageState extends State<HomePage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(35)),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+    );
+  }
+
+  Widget buildFidelityCardList() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: fidelityCardsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final cards = snapshot.data ?? [];
+        if (cards.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Text('Aucune carte de fidélité pour le moment.'),
+          );
+        }
+        return Column(
+          children: cards.map((c) => FidelityCard(
+            shopName: c['magasin_libelle']?.toString() ?? '',
+            balance: '${(c['solde'] as num?)?.toStringAsFixed(2) ?? '0.00'}€',
+          )).toList(),
+        );
+      },
     );
   }
 
@@ -192,7 +251,6 @@ class HomePageState extends State<HomePage> {
             final count = (v['nombre_visites'] as num?)?.toInt() ?? 0;
             final label = count == 1 ? '1 visite' : '$count visites';
             final id = v['magasin_id']?.toInt() ?? '';
-
 
             return VisitItem(
               id: id,

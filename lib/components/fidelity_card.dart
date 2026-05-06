@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 class FidelityCard extends StatelessWidget {
-  const FidelityCard({super.key});
+  final String shopName;
+  final String balance;
+
+  const FidelityCard({super.key, required this.shopName, required this.balance});
 
   @override
   Widget build(BuildContext context) {
@@ -32,19 +35,19 @@ class FidelityCard extends StatelessWidget {
                 const SizedBox(width: 16),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children: [
                     Text(
-                      'Auchan',
-                      style: TextStyle(
+                      shopName,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
-                      '1.34€',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
+                      balance,
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ],
                 ),
