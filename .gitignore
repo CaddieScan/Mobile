@@ -14,6 +14,7 @@ migrate_working_dir/
 
 android/key.properties
 .env
+*.env
 
 # IntelliJ related
 *.iml
