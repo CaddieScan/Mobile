@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'components/section_header.dart';
 import 'services/cart_service.dart';
 import 'models/promotions.dart';
@@ -76,11 +77,13 @@ class ScanPageState extends State<ScanPage> {
 
   late Product scannedProductDatas;
   int? currentCartId;
+  int? currentShopId = 1;
 
   @override
   void initState() {
     super.initState();
     initializeCamera();
+    loadShopId();
     fetchProducts();
     loadCartId();
   }
@@ -91,6 +94,19 @@ class ScanPageState extends State<ScanPage> {
     setState(() {
       scanErrorMessage = message;
     });
+  }
+
+  Future<void> loadShopId() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final shopIdStr = prefs.getString('current_shop_id_scan');
+      if (shopIdStr != null) {
+        currentShopId = int.tryParse(shopIdStr);
+      }
+      print("Loaded shop ID: $currentShopId");
+    } catch (e) {
+      showToast('Erreur chargement du magasin: $e');
+    }
   }
 
   Future<void> loadCartId() async {
@@ -209,7 +225,7 @@ class ScanPageState extends State<ScanPage> {
       // Créer un panier si on n'en a pas
       if (currentCartId == null) {
         print("Pas de panier, création...");
-        final newCartId = await createCart(1, 1);
+        final newCartId = await createCart(1, currentShopId!);
         if (newCartId == null) {
           showToast('Impossible de créer un panier');
           return;
