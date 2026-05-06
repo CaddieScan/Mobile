@@ -10,13 +10,9 @@ class ShopMap extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InteractiveViewer(
-      minScale: 0.5,
-      maxScale: 4,
-      child: CustomPaint(
-        size: const Size(300, 600),
-        painter: PlanPainter(zones, scale: 20),
-      ),
+    return CustomPaint(
+      size: const Size(2000, 2000),
+      painter: PlanPainter(zones, scale: 1.0),
     );
   }
 }

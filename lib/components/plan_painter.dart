@@ -1,13 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:caddiescan/models/zone.dart';
 
-class ZoneDisplay {
-  final double x1, y1, x2, y2;
-  final String label;
-
-  ZoneDisplay(this.x1, this.y1, this.x2, this.y2, this.label);
-}
-
 class PlanPainter extends CustomPainter {
   final List<Zone> zones;
   final double scale;
@@ -16,44 +9,56 @@ class PlanPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final fillPaint = Paint()
-      ..color = Colors.blue.withOpacity(0.3)
-      ..style = PaintingStyle.fill;
-
-    final borderPaint = Paint()
-      ..color = Colors.blue
-      ..style = PaintingStyle.stroke;
-
     for (var zone in zones) {
-      final left = (zone.x1 < zone.x2 ? zone.x1 : zone.x2) * scale;
-      final top = (zone.y1 < zone.y2 ? zone.y1 : zone.y2) * scale;
-      final width = (zone.x2 - zone.x1).abs() * scale;
-      final height = (zone.y2 - zone.y1).abs() * scale;
+      // Avec le nouveau format, left/top sont déjà x et y
+      final rect = Rect.fromLTWH(
+          zone.x * scale,
+          zone.y * scale,
+          zone.w * scale,
+          zone.h * scale
+      );
 
-      final rect = Rect.fromLTWH(left, top, width, height);
+      // Dessin du rectangle (Rayon)
+      final fillPaint = Paint()
+        ..color = Colors.grey.withOpacity(0.4) // Couleur plus neutre type "plan"
+        ..style = PaintingStyle.fill;
+
+      final borderPaint = Paint()
+        ..color = Colors.blueGrey
+        ..strokeWidth = 1.5
+        ..style = PaintingStyle.stroke;
 
       canvas.drawRect(rect, fillPaint);
       canvas.drawRect(rect, borderPaint);
 
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: zone.libelle,
-          style: const TextStyle(color: Colors.black, fontSize: 12),
-        ),
-        textDirection: TextDirection.ltr,
-      );
+      // Dessin du texte (Nom du rayon)
+      if (zone.w * scale > 20) { // On ne dessine le texte que si la zone est assez grande
+        final textPainter = TextPainter(
+          text: TextSpan(
+            text: zone.name,
+            style: TextStyle(
+                color: Colors.blueGrey[800],
+                fontSize: 10,
+                fontWeight: FontWeight.bold
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        );
 
-      textPainter.layout(maxWidth: width);
+        textPainter.layout(maxWidth: zone.w * scale);
 
-      final offset = Offset(
-        left + (width - textPainter.width) / 2,
-        top + (height - textPainter.height) / 2,
-      );
+        // Centrage du texte
+        final offset = Offset(
+          rect.left + (rect.width - textPainter.width) / 2,
+          rect.top + (rect.height - textPainter.height) / 2,
+        );
 
-      textPainter.paint(canvas, offset);
+        textPainter.paint(canvas, offset);
+      }
     }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(PlanPainter oldDelegate) =>
+      oldDelegate.zones != zones || oldDelegate.scale != scale;
 }
