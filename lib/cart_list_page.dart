@@ -5,7 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 import 'components/product_card.dart';
-import 'models/product.dart';
+import 'models/product_by_shop.dart';
 import 'services/cart_service.dart';
 
 class CartListPage extends StatefulWidget {
@@ -16,7 +16,7 @@ class CartListPage extends StatefulWidget {
 }
 
 class CartListPageState extends State<CartListPage> {
-  final List<Product> cartItems = [];
+  final List<ProductByShop> cartItems = [];
   bool isLoading = true;
 
   @override
@@ -59,7 +59,7 @@ class CartListPageState extends State<CartListPage> {
             ..addAll(
               data
                   .whereType<Map<String, dynamic>>()
-                  .map((item) => Product.fromJson(item)),
+                  .map((item) => ProductByShop.fromJson(item)),
             );
           isLoading = false;
         });

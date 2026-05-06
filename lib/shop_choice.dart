@@ -8,23 +8,19 @@ import 'components/section_header.dart';
 import 'components/shop_choice_card.dart';
 import 'models/shop.dart';
 
-late SharedPreferences prefs;
-
 class ShopChoicePage extends StatefulWidget {
   const ShopChoicePage({super.key});
 
   @override
   State<ShopChoicePage> createState() => ShopChoicePageState();
-
-
 }
 
 class ShopChoicePageState extends State<ShopChoicePage> {
+  late SharedPreferences prefs;
   late List<Shop> shops = [];
   Map<int, dynamic> rawShopData = {};
 
-  // fonction qui sauvegarde les favoris dans le téléphone
-  void saveFavorites(SharedPreferences prefs) {
+  void saveFavorites() {
     List<dynamic> favsToSave = [];
     for (var s in shops.where((shop) => shop.isFavorite)) {
       if (rawShopData.containsKey(s.id)) {
@@ -34,9 +30,7 @@ class ShopChoicePageState extends State<ShopChoicePage> {
     prefs.setString('favorite_shops_data', jsonEncode(favsToSave));
   }
 
-  // requête pour trouver tous les magasins en bdd avec position
-  // il renvoie une liste de Shops
-  Future<http.Response> fetchScan(double lat, double lon) {
+  Future<http.Response> fetchShops(double lat, double lon) {
     String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
     return http.post(
       Uri.parse('$baseUrl/shop/proximity?user_id=1'),
@@ -50,39 +44,34 @@ class ShopChoicePageState extends State<ShopChoicePage> {
     );
   }
 
-  void initShopList() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+  void showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
 
-    // ici on regarde si la géoloc est activée
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+  void initShopList() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: const Text('Services de localisation désactivés'), backgroundColor: Colors.red),
-      );
+      showError('Services de localisation désactivés');
       return;
     }
 
-    permission = await Geolocator.checkPermission();
+    LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: const Text('Permissions de localisation refusées'), backgroundColor: Colors.red),
-        );
+        showError('Permissions de localisation refusées');
         return;
       }
     }
-    
+
     if (permission == LocationPermission.deniedForever) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: const Text('Permissions de localisation refusées'), backgroundColor: Colors.red),
-      );
+      showError('Permissions de localisation refusées définitivement');
       return;
     }
 
-    // on charge les favoris stockés sur le téléphone
-    final prefs = await SharedPreferences.getInstance();
     setState(() {
       String? savedFavs = prefs.getString('favorite_shops_data');
       if (savedFavs != null && savedFavs.isNotEmpty) {
@@ -95,9 +84,7 @@ class ShopChoicePageState extends State<ShopChoicePage> {
             rawShopData[s.id] = item;
             shops.add(s);
           } catch (e) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Erreur chargement favori: $e'), backgroundColor: Colors.red),
-            );
+            showError('Erreur chargement favori: $e');
           }
         }
         shops.sort((a, b) => a.km.compareTo(b.km));
@@ -106,24 +93,20 @@ class ShopChoicePageState extends State<ShopChoicePage> {
 
     Position position = await Geolocator.getCurrentPosition();
 
-    fetchScan(position.latitude, position.longitude).then((response) {
+    fetchShops(position.latitude, position.longitude).then((response) {
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         setState(() {
           List<Shop> newShops = [];
-          for (int i = 0; i < data.length; i++) {
-            var item = data[i];
+          for (var item in data) {
             Shop s = Shop.fromJson(item);
             rawShopData[s.id] = item;
-
-            // Rétablir le statut favori
             if (shops.any((fav) => fav.id == s.id && fav.isFavorite)) {
               s.isFavorite = true;
             }
             newShops.add(s);
           }
 
-          // Maintenir les favoris qui sont désormais hors de la zone (pas dans data)
           for (var fav in shops.where((s) => s.isFavorite)) {
             if (!newShops.any((s) => s.id == fav.id)) {
               newShops.add(fav);
@@ -132,60 +115,52 @@ class ShopChoicePageState extends State<ShopChoicePage> {
 
           shops = newShops;
           shops.sort((a, b) => a.km.compareTo(b.km));
-
-          // sauvegarder les favoris
-          saveFavorites(prefs);
+          saveFavorites();
         });
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur magasins (HTTP ${response.statusCode})'), backgroundColor: Colors.red),
-        );
+        showError('Erreur magasins (HTTP ${response.statusCode})');
       }
     }).catchError((e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur réseau: $e'), backgroundColor: Colors.red),
-      );
+      showError('Erreur réseau: $e');
     });
   }
 
   @override
   void initState() {
     super.initState();
-    initShopList();
-    shops.sort((a, b) => a.km.compareTo(b.km));
-    SharedPreferences.getInstance().then((p) => prefs = p);
+    SharedPreferences.getInstance().then((p) {
+      setState(() => prefs = p);
+      initShopList();
+    });
   }
 
   void toggleFavorite(int index) async {
     final shop = shops[index];
-    final prefs = await SharedPreferences.getInstance();
 
     setState(() {
       shop.isFavorite = !shop.isFavorite;
-      saveFavorites(prefs); // On écrase avec la nouvelle liste de favoris
+      saveFavorites();
     });
 
-    if (shop.isFavorite) {
-      try {
-        String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
-        final response = await http.post(
-          Uri.parse('$baseUrl/shop/favorite'),
-          headers: {"Content-Type": "application/json"},
-          body: jsonEncode({
-            "shop_id": shop.id
-          }),
-        );
-        if (response.statusCode != 200) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erreur ajout favoris (${response.statusCode})'), backgroundColor: Colors.red),
-          );
-        }
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur connexion API: $e'), backgroundColor: Colors.red),
-        );
+    final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/shop/favorite'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"user_id": 1, "shop_id": shop.id}),
+      );
+      if (response.statusCode != 200) {
+        showError('Erreur toggle favoris (${response.statusCode})');
       }
+    } catch (e) {
+      showError('Erreur connexion API: $e');
     }
+  }
+
+  void navigateToScan(int shopId) {
+    prefs.setString('current_shop_id_scan', shopId.toString());
+    Navigator.pushNamed(context, '/scan');
   }
 
   @override
@@ -198,9 +173,7 @@ class ShopChoicePageState extends State<ShopChoicePage> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF007AFF)),
           onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            }
+            if (Navigator.canPop(context)) Navigator.pop(context);
           },
         ),
         title: const Text(
@@ -214,9 +187,7 @@ class ShopChoicePageState extends State<ShopChoicePage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.add, color: Color(0xFF007AFF), size: 36),
-            onPressed: () {
-              Navigator.pushNamed(context, '/profile');
-            },
+            onPressed: () => Navigator.pushNamed(context, '/profile'),
           ),
         ],
       ),
@@ -229,16 +200,19 @@ class ShopChoicePageState extends State<ShopChoicePage> {
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 40.0),
                 child: Center(
-                  child: Text('Pas de magasins dans les alentours et aucun favori sauvegardé.', style: TextStyle(fontSize: 16), textAlign: TextAlign.center,),
+                  child: Text(
+                    'Pas de magasins dans les alentours et aucun favori sauvegardé.',
+                    style: TextStyle(fontSize: 16),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               )
             else
               Column(
                 children: [
-                  // affichage de la liste des magasins en favoris
                   const SectionHeader(title: 'Favoris'),
                   for (int i = 0; i < shops.length; i++)
-                    if (shops[i].isFavorite == true)
+                    if (shops[i].isFavorite)
                       ShopChoiceCard(
                         location: shops[i].location,
                         latitude: shops[i].latitude,
@@ -247,13 +221,9 @@ class ShopChoicePageState extends State<ShopChoicePage> {
                         icon: shops[i].icon,
                         isFavorite: shops[i].isFavorite,
                         onFavoritePressed: () => toggleFavorite(i),
-                        onPressed: () {
-                          prefs.setString('current_shop_id_scan', shops[i].id.toString());
-                          Navigator.pushNamed(context, '/scan');
-                        },
+                        onPressed: () => navigateToScan(shops[i].id),
                       ),
 
-                  // si aucun favori, afficher qu'il n'y en a pas
                   if (!shops.any((shop) => shop.isFavorite))
                     const Center(child: Text('Aucun favori')),
 
@@ -261,7 +231,6 @@ class ShopChoicePageState extends State<ShopChoicePage> {
 
                   if (shops.any((shop) => !shop.isFavorite)) ...[
                     const SectionHeader(title: 'A proximité'),
-                    // affichage de la liste des magasins à proximité
                     for (int i = 0; i < shops.length; i++)
                       if (!shops[i].isFavorite)
                         ShopChoiceCard(
@@ -272,15 +241,15 @@ class ShopChoicePageState extends State<ShopChoicePage> {
                           icon: shops[i].icon,
                           isFavorite: shops[i].isFavorite,
                           onFavoritePressed: () => toggleFavorite(i),
-                          onPressed: () {
-                            Navigator.pushNamed(context, '/scan');
-                          },
+                          onPressed: () => navigateToScan(shops[i].id),
                         ),
                   ] else ...[
-                     const Padding(
-                       padding: EdgeInsets.only(top: 20),
-                       child: Center(child: Text('Pas d\'autres magasins dans les alentours')),
-                     )
+                    const Padding(
+                      padding: EdgeInsets.only(top: 20),
+                      child: Center(
+                        child: Text('Pas d\'autres magasins dans les alentours'),
+                      ),
+                    )
                   ],
                 ],
               ),
