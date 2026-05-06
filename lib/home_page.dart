@@ -22,7 +22,7 @@ class HomePage extends StatefulWidget {
 class HomePageState extends State<HomePage> {
   late Future<List<Map<String, dynamic>>> purchasesFuture;
   late Future<List<Map<String, dynamic>>> visitsFuture;
-  late Future<List<Map<String, dynamic>>> fidelityCardsFuture;
+  List<Map<String, dynamic>> fidelityCards = [];
 
   @override
   void initState() {
@@ -30,7 +30,7 @@ class HomePageState extends State<HomePage> {
     CartService.clearCartId();
     purchasesFuture = fetchUserCarts();
     visitsFuture = fetchUserVisits();
-    fidelityCardsFuture = fetchFidelityCards();
+    fetchFidelityCards();
     SharedPreferences.getInstance().then((p) => prefs = p);
   }
 
@@ -82,21 +82,22 @@ class HomePageState extends State<HomePage> {
     }
   }
 
-  // on récupère les cartes de fidélité de l'utilisateur
-  Future<List<Map<String, dynamic>>> fetchFidelityCards() async {
+  // on récupère les cartes de fidélité de l'utilisateur (404 = aucune carte, pas une erreur)
+  Future<void> fetchFidelityCards() async {
     try {
       final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
-      final response = await http.get(Uri.parse('$baseUrl/fidelity/user/1'));
+      final response = await http.get(Uri.parse('$baseUrl/carte_fidelite/user/1'));
+      if (response.statusCode == 404) return;
       if (response.statusCode != 200) {
         showToast('Erreur chargement cartes (HTTP ${response.statusCode})');
-        return [];
+        return;
       }
-      return (jsonDecode(response.body) as List)
+      final cards = (jsonDecode(response.body) as List)
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList();
+      setState(() => fidelityCards = cards);
     } catch (e) {
       showToast('Erreur réseau cartes: $e');
-      return [];
     }
   }
 
@@ -106,9 +107,7 @@ class HomePageState extends State<HomePage> {
       context: context,
       builder: (context) => const AddFidelityCardDialog(),
     );
-    if (added == true) {
-      setState(() => fidelityCardsFuture = fetchFidelityCards());
-    }
+    if (added == true) fetchFidelityCards();
   }
 
   @override
@@ -166,29 +165,17 @@ class HomePageState extends State<HomePage> {
   }
 
   Widget buildFidelityCardList() {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: fidelityCardsFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-        final cards = snapshot.data ?? [];
-        if (cards.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Text('Aucune carte de fidélité pour le moment.'),
-          );
-        }
-        return Column(
-          children: cards.map((c) => FidelityCard(
-            shopName: c['magasin_libelle']?.toString() ?? '',
-            balance: '${(c['solde'] as num?)?.toStringAsFixed(2) ?? '0.00'}€',
-          )).toList(),
-        );
-      },
+    if (fidelityCards.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Text('Aucune carte de fidélité pour le moment.'),
+      );
+    }
+    return Column(
+      children: fidelityCards.map((c) => FidelityCard(
+        shopName: c['magasin_libelle']?.toString() ?? '',
+        balance: 'Carte n°${c['code_barre']?.toString() ?? ''}',
+      )).toList(),
     );
   }
 
