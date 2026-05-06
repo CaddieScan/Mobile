@@ -3,62 +3,82 @@ import 'package:caddiescan/models/zone.dart';
 
 class PlanPainter extends CustomPainter {
   final List<Zone> zones;
+  final String? highlightedName;
   final double scale;
 
-  PlanPainter(this.zones, {this.scale = 1.0});
+  PlanPainter(this.zones, {this.highlightedName, this.scale = 1.0});
 
   @override
   void paint(Canvas canvas, Size size) {
-    for (var zone in zones) {
-      // Avec le nouveau format, left/top sont déjà x et y
+    if (zones.isEmpty) return;
+
+    // Log pour s'assurer de ce qu'on compare
+    print("PlanPainter - Nom reçu : '$highlightedName'");
+
+    for (int i = 0; i < zones.length; i++) {
+      var zone = zones[i];
       final rect = Rect.fromLTWH(
-          zone.x * scale,
-          zone.y * scale,
-          zone.w * scale,
-          zone.h * scale
+        zone.x * scale,
+        zone.y * scale,
+        zone.w * scale,
+        zone.h * scale,
       );
 
-      // Dessin du rectangle (Rayon)
+      // --- NOUVELLE LOGIQUE CONDITIONNELLE ---
+      // 1. Si aucun nom n'est recherché : fond neutre
+      // 2. Si un nom est cherché : on surbrille le premier élément trouvé (index 0) ou celui qui correspond
+      bool isHighlighted = false;
+
+      if (highlightedName != null && highlightedName!.isNotEmpty) {
+        // Option A : Surbrillance du 1er élément UNIQUEMENT lors d'une recherche
+        if (i == 0) {
+          isHighlighted = true;
+        }
+      }
+
       final fillPaint = Paint()
-        ..color = Colors.grey.withOpacity(0.4) // Couleur plus neutre type "plan"
+        ..color = isHighlighted
+            ? Colors.orange.withOpacity(0.8) // Actif uniquement lors d'une recherche
+            : Colors.blue.withOpacity(0.1)
         ..style = PaintingStyle.fill;
 
       final borderPaint = Paint()
-        ..color = Colors.blueGrey
-        ..strokeWidth = 1.5
+        ..color = isHighlighted ? Colors.deepOrange : Colors.blueGrey
+        ..strokeWidth = isHighlighted ? 3.0 : 1.0
         ..style = PaintingStyle.stroke;
 
+      // Dessin
       canvas.drawRect(rect, fillPaint);
       canvas.drawRect(rect, borderPaint);
 
-      // Dessin du texte (Nom du rayon)
-      if (zone.w * scale > 20) { // On ne dessine le texte que si la zone est assez grande
+      // Texte
+      if (zone.w > 10) {
         final textPainter = TextPainter(
           text: TextSpan(
             text: zone.name,
             style: TextStyle(
-                color: Colors.blueGrey[800],
-                fontSize: 10,
-                fontWeight: FontWeight.bold
+              color: isHighlighted ? Colors.black : Colors.black54,
+              fontSize: 10,
+              fontWeight: isHighlighted ? FontWeight.bold : FontWeight.normal,
             ),
           ),
           textDirection: TextDirection.ltr,
+        )..layout(maxWidth: zone.w * scale);
+
+        textPainter.paint(
+          canvas,
+          Offset(
+            rect.left + (rect.width - textPainter.width) / 2,
+            rect.top + (rect.height - textPainter.height) / 2,
+          ),
         );
-
-        textPainter.layout(maxWidth: zone.w * scale);
-
-        // Centrage du texte
-        final offset = Offset(
-          rect.left + (rect.width - textPainter.width) / 2,
-          rect.top + (rect.height - textPainter.height) / 2,
-        );
-
-        textPainter.paint(canvas, offset);
       }
     }
   }
 
   @override
-  bool shouldRepaint(PlanPainter oldDelegate) =>
-      oldDelegate.zones != zones || oldDelegate.scale != scale;
+  bool shouldRepaint(covariant PlanPainter oldDelegate) {
+    return oldDelegate.highlightedName != highlightedName ||
+        oldDelegate.zones != zones;
+  }
 }

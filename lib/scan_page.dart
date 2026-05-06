@@ -104,7 +104,17 @@ class ScanPageState extends State<ScanPage> {
   }
 
   void _onProductTap(Product product) {
-    Navigator.pushNamed(context, '/map');
+    // On s'assure que l'on passe bien le nom de la catégorie (ex: "Boissons")
+    final String categoryName = product.category;
+
+    print("DEBUG: Envoi de la catégorie = $categoryName");
+
+    Navigator.pushNamed(
+      context,
+      '/map',
+      arguments: categoryName,
+    );
+
     searchController.clear();
   }
 
