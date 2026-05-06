@@ -1,9 +1,43 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'services/cart_service.dart';
 
-class ValidationPage extends StatelessWidget {
+class ValidationPage extends StatefulWidget {
   const ValidationPage({super.key});
 
+  @override
+  State<ValidationPage> createState() => ValidationPageState();
+}
+
+class ValidationPageState extends State<ValidationPage> {
+  String? fidelityCardCode;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchFidelityCard();
+  }
+
+  // on récupère la carte de fidélité de l'utilisateur pour le magasin courant
+  Future<void> fetchFidelityCard() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final shopIdStr = prefs.getString('current_shop_id_scan');
+      if (shopIdStr == null) return;
+
+      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000';
+      final response = await http.get(Uri.parse('$baseUrl/carte_fidelite/user/1/magasin/$shopIdStr'));
+      if (response.statusCode != 200) return;
+
+      final data = Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+      setState(() => fidelityCardCode = data['code_barre']?.toString());
+    } catch (e) {
+      debugPrint('Erreur récupération carte fidélité: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,6 +71,12 @@ class ValidationPage extends StatelessWidget {
                 color: Colors.black12,
                 alignment: Alignment.center,
               ),
+              const SizedBox(height: 16),
+              if (fidelityCardCode != null)
+                Text(
+                  'Carte de fidélité : $fidelityCardCode',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                ),
               const SizedBox(height: 40),
               ElevatedButton(
                 onPressed: () {
@@ -63,4 +103,3 @@ class ValidationPage extends StatelessWidget {
     );
   }
 }
-
