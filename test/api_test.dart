@@ -41,7 +41,7 @@ void main() {
     final apiService = ApiService(client: fakeClient);
 
     // ACT
-    final call = () => apiService.scanProduct('000000000');
+    call() => apiService.scanProduct('000000000');
 
     // ASSERT
     expect(call, throwsException);
@@ -85,7 +85,7 @@ void main() {
     final apiService = ApiService(client: fakeClient);
 
     // ACT
-    final call = () => apiService.addToCart('000000000', 1);
+    call() => apiService.addToCart('000000000', 1);
 
     // ASSERT
     expect(call, throwsException);
@@ -127,7 +127,7 @@ void main() {
     final apiService = ApiService(client: fakeClient);
 
     // ACT
-    final response = () => apiService.getProximityShops(1, 999.0, 999.0);
+    response() => apiService.getProximityShops(1, 999.0, 999.0);
 
     // ASSERT
     expect(response, throwsException);
