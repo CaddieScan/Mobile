@@ -1,26 +1,29 @@
 import 'package:flutter/material.dart';
 class Zone {
-  double x1;
-  double y1;
-  double x2;
-  double y2;
-  String libelle;
+  final String id;
+  final String name;
+  final double x;
+  final double y;
+  final double w;
+  final double h;
 
   Zone({
-    required this.x1,
-    required this.y1,
-    required this.x2,
-    required this.y2,
-    required this.libelle,
+    required this.id,
+    required this.name,
+    required this.x,
+    required this.y,
+    required this.w,
+    required this.h,
   });
 
-  static Zone fromJson(Map<String, dynamic> json) {
+  factory Zone.fromJson(Map<String, dynamic> json) {
     return Zone(
-      x1: (json["point1_x"] as num).toDouble(),
-      y1: (json["point1_y"] as num).toDouble(),
-      x2: (json["point2_x"] as num).toDouble(),
-      y2: (json["point2_y"] as num).toDouble(),
-      libelle: json["libelle"],
+      id: json['id'],
+      name: json['name'],
+      x: (json['x'] as num).toDouble(),
+      y: (json['y'] as num).toDouble(),
+      w: (json['w'] as num).toDouble(),
+      h: (json['h'] as num).toDouble(),
     );
   }
 }
